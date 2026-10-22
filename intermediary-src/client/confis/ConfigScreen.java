@@ -394,8 +394,23 @@ public class ConfigScreen extends class_437 {
 
     /** Vanilla button click sound (used by the category tabs). */
     private static void playClick() {
-        net.minecraft.client.MinecraftClient.getInstance().getSoundManager().play(
-                net.minecraft.client.sound.PositionedSoundInstance.master(net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK.value(), 1.0F));
+        // The factory method for UI sounds was renamed between Minecraft versions (master -> ui ...), so it is found by
+        // its signature (static, (sound, float) -> SoundInstance) instead of by name. A missing sound never crashes.
+        try {
+            Object ev = net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK;
+            for (java.lang.reflect.Method m : net.minecraft.client.sound.PositionedSoundInstance.class.getMethods()) {
+                Class<?>[] p = m.getParameterTypes();
+                if (!java.lang.reflect.Modifier.isStatic(m.getModifiers()) || p.length != 2 || p[1] != float.class) continue;
+                if (!net.minecraft.client.sound.SoundInstance.class.isAssignableFrom(m.getReturnType())) continue;
+                Object arg = p[0].isInstance(ev) ? ev
+                        : p[0] == net.minecraft.sound.SoundEvent.class ? ((net.minecraft.registry.entry.RegistryEntry<?>) ev).value() : null;
+                if (arg == null) continue;
+                net.minecraft.client.MinecraftClient.getInstance().getSoundManager()
+                        .play((net.minecraft.client.sound.SoundInstance) m.invoke(null, arg, 1.0F));
+                return;
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     // ------------------------------------------------------------- mods grid
